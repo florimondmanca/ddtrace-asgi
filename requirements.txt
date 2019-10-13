@@ -1,0 +1,10 @@
+# Dependencies.
+ddtrace
+starlette
+
+# Tooling.
+black
+flake8
+mypy
+pytest
+httpx  # Test client.
