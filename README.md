@@ -24,7 +24,10 @@ For more information on Datadog tracing, please see the official [`dd-trace-py`]
 
 ## Examples
 
-- [Starlette](https://www.starlette.io/):
+<details>
+<summary>
+    <a href="https://www.starlette.io/">Starlette</a>
+</summary>
 
 ```python
 from ddtrace import tracer
@@ -34,3 +37,5 @@ from starlette.applications import Starlette
 app = Starlette()
 app = TraceMiddleware(app, tracer, service="my-starlette-app")
 ```
+
+</details>
