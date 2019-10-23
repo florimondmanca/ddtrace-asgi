@@ -2,12 +2,10 @@ import typing
 
 import httpx
 import pytest
-from ddtrace import config
-from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY
-from ddtrace.ext import errors as err_ext, http as http_ext
+from ddtrace.ext import http as http_ext
+from ddtrace.span import Span
 from ddtrace.tracer import Tracer
 from starlette.types import Receive, Scope, Send
-from ddtrace.span import Span
 
 from ddtrace_asgi.middleware import TraceMiddleware
 
@@ -38,7 +36,7 @@ def client(tracer: Tracer) -> typing.Iterator[httpx.Client]:
         yield client
 
 
-def test_app(client: httpx.Client, tracer: Tracer):
+def test_app(client: httpx.Client, tracer: Tracer) -> None:
     r = client.get("/example")
     assert r.status_code == 200
     assert r.text == "Hello, world!"

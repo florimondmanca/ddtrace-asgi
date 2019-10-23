@@ -1,11 +1,12 @@
-# Dependencies.
 -e .
-ddtrace
-starlette
 
-# Tooling.
 black
 flake8
+flake8-bugbear
+flake8-comprehensions
+isort
+httpx
 mypy
+nox
 pytest
-httpx  # Test client.
+pytest-cov

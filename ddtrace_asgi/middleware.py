@@ -1,18 +1,12 @@
-import sys
-import typing
-
-from ddtrace.compat import iteritems
 from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY
 from ddtrace.ext import http as http_tags
 from ddtrace.http import store_request_headers, store_response_headers
 from ddtrace.propagation.http import HTTPPropagator
 from ddtrace.settings import config
 from ddtrace.tracer import Tracer
-from ddtrace.span import Span
-
-from starlette.datastructures import Headers, URL
+from starlette.datastructures import Headers
 from starlette.requests import Request
-from starlette.types import ASGIApp, Receive, Scope, Send, Message
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 
 class TraceMiddleware:

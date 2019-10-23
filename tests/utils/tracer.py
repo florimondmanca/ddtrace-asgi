@@ -1,33 +1,43 @@
 """
 Copied from:
 https://github.com/DataDog/dd-trace-py/blob/master/tests/utils/tracer.py
+
+Changes:
+- Add type annotations.
+- Make flake8-compliant.
 """
 
+import typing
 
 from ddtrace.encoding import JSONEncoder, MsgpackEncoder
 from ddtrace.internal.writer import AgentWriter
 from ddtrace.tracer import Tracer
 
+Span = typing.Any
+Trace = typing.Any
+Service = typing.Any
+
 
 class DummyWriter(AgentWriter):
     """DummyWriter is a small fake writer used for tests. not thread-safe."""
 
-    def __init__(self, *args, **kwargs):
-        # original call
-        super(DummyWriter, self).__init__(*args, **kwargs)
+    def __init__(self, *args: typing.Any, **kwargs: typing.Any) -> None:
+        super().__init__(*args, **kwargs)
 
-        # dummy components
-        self.spans = []
-        self.traces = []
-        self.services = {}
+        # Dummy components.
+        self.spans: typing.List[Span] = []
+        self.traces: typing.List[Trace] = []
+        self.services: typing.Dict[str, Service] = {}
         self.json_encoder = JSONEncoder()
         self.msgpack_encoder = MsgpackEncoder()
 
-    def write(self, spans=None, services=None):
+    def write(
+        self, spans: typing.List[Span] = None, services: typing.List[Service] = None
+    ) -> None:
         if spans:
-            # the traces encoding expect a list of traces so we
+            # The traces encoding expect a list of traces so we
             # put spans in a list like we do in the real execution path
-            # with both encoders
+            # with both encoders.
             trace = [spans]
             self.json_encoder.encode_traces(trace)
             self.msgpack_encoder.encode_traces(trace)
@@ -39,22 +49,22 @@ class DummyWriter(AgentWriter):
             self.msgpack_encoder.encode_services(services)
             self.services.update(services)
 
-    def pop(self):
-        # dummy method
+    def pop(self) -> typing.List[Span]:
+        # Dummy method.
         s = self.spans
         self.spans = []
         return s
 
-    def pop_traces(self):
-        # dummy method
+    def pop_traces(self) -> typing.List[Trace]:
+        # Dummy method.
         traces = self.traces
         self.traces = []
         return traces
 
-    def pop_services(self):
-        # dummy method
-
-        # Setting service info has been deprecated, we want to make sure nothing ever gets written here
+    def pop_services(self) -> typing.Dict[str, Service]:
+        # Dummy method.
+        # Setting service info has been deprecated,
+        # we want to make sure nothing ever gets written here.
         assert self.services == {}
         s = self.services
         self.services = {}
@@ -66,11 +76,13 @@ class DummyTracer(Tracer):
     DummyTracer is a tracer which uses the DummyWriter by default
     """
 
-    def __init__(self):
-        super(DummyTracer, self).__init__()
+    writer: typing.Any
+
+    def __init__(self) -> None:
+        super().__init__()
         self._update_writer()
 
-    def _update_writer(self):
+    def _update_writer(self) -> None:
         self.writer = DummyWriter(
             hostname=self.writer.api.hostname,
             port=self.writer.api.port,
@@ -78,7 +90,7 @@ class DummyTracer(Tracer):
             priority_sampler=self.writer._priority_sampler,
         )
 
-    def configure(self, *args, **kwargs):
-        super(DummyTracer, self).configure(*args, **kwargs)
-        # `.configure()` may reset the writer
+    def configure(self, *args: typing.Any, **kwargs: typing.Any) -> None:
+        super().configure(*args, **kwargs)
+        # `.configure()` may reset the writer.
         self._update_writer()
