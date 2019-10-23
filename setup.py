@@ -24,7 +24,7 @@ def get_packages(package: str) -> typing.List[str]:
 
 setup(
     name="ddtrace-asgi",
-    version="0.0.1",
+    version=get_version("ddtrace_asgi"),
     description="Unofficial ddtrace integration for ASGI apps and frameworks",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
