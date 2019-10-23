@@ -6,8 +6,6 @@
 
 Unofficial [`ddtrace`] integration for ASGI apps and frameworks.
 
-Use `ddtrace-asgi` to automatically send traces to [Datadog APM](https://docs.datadoghq.com/tracing/), which allows you to visualize traffic and detailed traces of requests.
-
 Should work seamlessly for any ASGI web framework, e.g. Starlette, FastAPI, Quart, etc.
 
 [`ddtrace`]: https://github.com/DataDog/dd-trace-py
@@ -20,18 +18,28 @@ Should work seamlessly for any ASGI web framework, e.g. Starlette, FastAPI, Quar
 pip install ddtrace-asgi
 ```
 
-## Usage
+## Quickstart
 
-Wrap an ASGI application around `TraceMiddleware` to automatically send tracing information to Datadog on each HTTP request:
+To automatically send traces to [Datadog APM](https://docs.datadoghq.com/tracing/) on each HTTP request, wrap your ASGI application around `TraceMiddleware`:
 
 ```python
+# app.py
 from ddtrace import tracer
 from ddtrace_asgi.middleware import TraceMiddleware
 
 async def app(scope, receive, send):
-    ...
+    assert scope["type"] == "http"
+    headers = [[b"content-type", b"text/plain"]]
+    await send({"type": "http.response.start", "status": 200, "headers": headers})
+    await send({"type": "http.response.body", "body": b"Hello, world!"})
 
-app = TraceMiddleware(app, tracer, service="my-app")
+app = TraceMiddleware(app, tracer, service="asgi-hello-world")
+```
+
+Then use `ddtrace-run` when serving your application. For example, if serving with Uvicorn:
+
+```bash
+ddtrace-run uvicorn app:app
 ```
 
 For more information on using `ddtrace`, please see the official [`ddtrace`] repository.
@@ -65,15 +73,6 @@ class TracingMiddleware:
 ```
 
 An ASGI middleware that sends traces of HTTP requests to Datadog APM.
-
-**Usage**
-
-```python
-from ddtrace import tracer
-from ddtrace_asgi.middleware import TracingMiddleware
-
-app = TracingMiddleware(app, tracer)
-```
 
 **Parameters**
 
