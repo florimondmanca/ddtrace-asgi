@@ -35,7 +35,7 @@ setup(
     include_package_data=True,
     package_data={"ddtrace_asgi": ["py.typed"]},
     zip_safe=False,
-    install_requires=["ddtrace", "starlette==0.12.*"],
+    install_requires=["ddtrace", "starlette==0.*"],
     python_requires=">=3.6",
     license="BSD",
     classifiers=[
