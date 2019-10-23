@@ -1,8 +1,10 @@
 # ddtrace-asgi
 
-Unofficial [Datadog tracing][dd-trace-py] integration for ASGI apps and frameworks.
+Unofficial [`ddtrace`] integration for ASGI apps and frameworks.
 
-[dd-trace-py]: https://github.com/DataDog/dd-trace-py
+Use `ddtrace-asgi` to automatically send traces to [Datadog APM](https://docs.datadoghq.com/tracing/), which allows you to visualize traffic and detailed traces of requests.
+
+[`ddtrace`]: https://github.com/DataDog/dd-trace-py
 
 > This is a proof of concept and a work in progress.
 
@@ -20,7 +22,7 @@ async def app(scope, receive, send):
 app = TraceMiddleware(app, tracer, service="my-app")
 ```
 
-For more information on Datadog tracing, please see the official [`dd-trace-py`][dd-trace-py] repository.
+For more information on using `ddtrace`, please see the official [`ddtrace`] repository.
 
 ## Examples
 
