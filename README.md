@@ -4,6 +4,8 @@ Unofficial [`ddtrace`] integration for ASGI apps and frameworks.
 
 Use `ddtrace-asgi` to automatically send traces to [Datadog APM](https://docs.datadoghq.com/tracing/), which allows you to visualize traffic and detailed traces of requests.
 
+Should work seamlessly for any ASGI web framework, e.g. Starlette, FastAPI, Quart, etc.
+
 [`ddtrace`]: https://github.com/DataDog/dd-trace-py
 
 > This is a proof of concept and a work in progress.
