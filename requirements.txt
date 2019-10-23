@@ -1,4 +1,5 @@
 # Dependencies.
+-e .
 ddtrace
 starlette
 
