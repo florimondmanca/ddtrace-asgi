@@ -22,7 +22,7 @@ pip install ddtrace-asgi
 
 ## Usage
 
-Wrap an ASGI application around `TraceMiddleware` to automatically send tracing information to Datadog on each HTTP request.
+Wrap an ASGI application around `TraceMiddleware` to automatically send tracing information to Datadog on each HTTP request:
 
 ```python
 from ddtrace import tracer
@@ -53,3 +53,35 @@ app = TraceMiddleware(app, tracer, service="my-starlette-app")
 ```
 
 </details>
+
+## API Reference
+
+### `TracingMiddleware`
+
+```python
+class TracingMiddleware:
+    def __init__(self, app, tracer, service="asgi", distributed_tracing=True):
+        ...
+```
+
+An ASGI middleware that sends traces of HTTP requests to Datadog APM.
+
+**Usage**
+
+```python
+from ddtrace import tracer
+from ddtrace_asgi.middleware import TracingMiddleware
+
+app = TracingMiddleware(app, tracer)
+```
+
+**Parameters**
+
+- **app** - An [ASGI] application.
+- **tracer** - A [`Tracer`] object.
+- **service** - _(optional)_ Name of the service as it will appear on Datadog.
+- **distributed_tracing** - _(optional)_ Whether to enable [distributed tracing].
+
+[asgi]: https://asgi.readthedocs.io
+[`tracer`]: http://pypi.datadoghq.com/trace/docs/advanced_usage.html#tracer
+[distributed tracing]: http://pypi.datadoghq.com/trace/docs/advanced_usage.html#distributed-tracing
