@@ -7,7 +7,7 @@ setup(
     url="http://github.com/florimondmanca/ddtrace-asgi",
     author="Florimond Manca",
     author_email="florimond.manca@gmail.com",
-    license="MIT",
+    license="BSD",
     packages=["ddtrace_asgi"],
     zip_safe=False,
 )
