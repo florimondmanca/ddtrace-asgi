@@ -12,7 +12,13 @@ Should work seamlessly for any ASGI web framework, e.g. Starlette, FastAPI, Quar
 
 [`ddtrace`]: https://github.com/DataDog/dd-trace-py
 
-> This is a proof of concept and a work in progress.
+**Note**: This project is in alpha stage.
+
+## Installation
+
+```bash
+pip install ddtrace-asgi
+```
 
 ## Usage
 
