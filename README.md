@@ -45,10 +45,7 @@ For more information on using `ddtrace`, please see the official [`ddtrace`] rep
 
 ## Examples
 
-<details>
-<summary>
-    <a href="https://www.starlette.io/">Starlette</a>
-</summary>
+### Starlette
 
 ```python
 from ddtrace_asgi.middleware import TraceMiddleware
@@ -58,15 +55,13 @@ app = Starlette()
 app.add_middleware(TraceMiddleware, service="my-starlette-app")
 ```
 
-</details>
-
 ## API Reference
 
 ### `TracingMiddleware`
 
 ```python
 class TracingMiddleware:
-    def __init__(self, app, tracer=tracer, service="asgi", distributed_tracing=True):
+    def __init__(self, app, tracer=None, service="asgi", distributed_tracing=True):
         ...
 ```
 
