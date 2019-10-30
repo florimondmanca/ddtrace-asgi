@@ -51,9 +51,9 @@ class DummyWriter(AgentWriter):
 
     def pop(self) -> typing.List[Span]:
         # Dummy method.
-        s = self.spans
+        spans = self.spans
         self.spans = []
-        return s
+        return spans
 
     def pop_traces(self) -> typing.List[Trace]:
         # Dummy method.
@@ -66,9 +66,9 @@ class DummyWriter(AgentWriter):
         # Setting service info has been deprecated,
         # we want to make sure nothing ever gets written here.
         assert self.services == {}
-        s = self.services
+        services = self.services
         self.services = {}
-        return s
+        return services
 
 
 class DummyTracer(Tracer):
