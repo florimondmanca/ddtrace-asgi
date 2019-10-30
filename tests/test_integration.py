@@ -8,6 +8,7 @@ from ddtrace.tracer import Tracer
 from starlette.types import Receive, Scope, Send
 
 from ddtrace_asgi.middleware import TraceMiddleware
+from tests.utils.asgi import mock_http_scope, mock_receive, mock_send
 
 
 async def hello_world(scope: Scope, receive: Receive, send: Send) -> None:
@@ -52,3 +53,23 @@ def test_app(client: httpx.Client, tracer: Tracer) -> None:
     assert span.get_tag(http_ext.URL) == "http://testserver/example"
     assert http_ext.QUERY_STRING not in span.meta
     assert span.parent_id is None
+
+
+@pytest.mark.asyncio
+async def test_invalid_asgi(tracer: Tracer) -> None:
+    """Test that TraceMiddleware does not crash in case of ASGI protocol violation."""
+
+    async def invalid(scope: Scope, receive: Receive, send: Send) -> None:
+        for key in "type", "headers", "status":
+            message = {"type": "http.response.start", "headers": [], "status": 200}
+            message.pop(key)
+            await send(message)
+
+    app = TraceMiddleware(invalid, tracer=tracer)
+
+    for key in "method", "path", "headers", "query_string":
+        scope = dict(mock_http_scope)
+        scope.pop(key)
+        await app(scope, mock_receive, mock_send)
+
+    await app(mock_http_scope, mock_receive, mock_send)

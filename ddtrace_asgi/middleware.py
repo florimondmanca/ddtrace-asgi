@@ -33,14 +33,26 @@ class TraceMiddleware:
             return
 
         request = Request(scope=scope, receive=receive)
+        try:
+            request_headers = request.headers
+            method = request.method
+            url = request.url
+        except KeyError:
+            # ASGI message is invalid - most likely missing the 'headers' or 'method'
+            # fields.
+            await self.app(scope, receive, send)
+            return
+
+        # Make sure we don't use potentially unsafe request attributes after this point.
+        del request
 
         if self._distributed_tracing:
             propagator = HTTPPropagator()
-            context = propagator.extract(request.headers)
+            context = propagator.extract(request_headers)
             if context.trace_id:
                 self.tracer.context_provider.activate(context)
 
-        resource = "%s %s" % (request.method, request.url.path)
+        resource = "%s %s" % (method, url.path)
         span = self.tracer.trace(
             name="asgi.request",
             service=self.service,
@@ -52,27 +64,24 @@ class TraceMiddleware:
             ANALYTICS_SAMPLE_RATE_KEY,
             config.asgi.get_analytics_sample_rate(use_global_config=True),
         )
-        span.set_tag(http_tags.METHOD, request.method)
-        span.set_tag(http_tags.URL, str(request.url))
+        span.set_tag(http_tags.METHOD, method)
+        span.set_tag(http_tags.URL, str(url))
         if config.asgi.trace_query_string:
-            span.set_tag(http_tags.QUERY_STRING, request.url.query)
+            span.set_tag(http_tags.QUERY_STRING, url.query)
 
         # NOTE: any request header set in the future will not be stored in the span.
-        store_request_headers(request.headers, span, config.asgi)
+        store_request_headers(request_headers, span, config.asgi)
 
         async def send_with_tracing(message: Message) -> None:
             span = self.tracer.current_span()
 
-            if not span:
-                # Unexpected.
-                await send(message)
-                return
-
-            if message["type"] == "http.response.start":
-                status_code: int = message["status"]
-                response_headers = Headers(raw=message["headers"])
-                store_response_headers(response_headers, span, config.asgi)
-                span.set_tag(http_tags.STATUS_CODE, str(status_code))
+            if span and message.get("type") == "http.response.start":
+                if "status" in message:
+                    status_code: int = message["status"]
+                    span.set_tag(http_tags.STATUS_CODE, str(status_code))
+                if "headers" in message:
+                    response_headers = Headers(raw=message["headers"])
+                    store_response_headers(response_headers, span, config.asgi)
 
             await send(message)
 

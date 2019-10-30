@@ -9,4 +9,5 @@ httpx
 mypy
 nox
 pytest
+pytest-asyncio
 pytest-cov
