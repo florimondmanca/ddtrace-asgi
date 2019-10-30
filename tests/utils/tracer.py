@@ -76,7 +76,7 @@ class DummyTracer(Tracer):
     DummyTracer is a tracer which uses the DummyWriter by default
     """
 
-    writer: typing.Any
+    writer: DummyWriter
 
     def __init__(self) -> None:
         super().__init__()

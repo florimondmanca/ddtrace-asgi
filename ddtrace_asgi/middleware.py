@@ -28,6 +28,8 @@ class TraceMiddleware:
         self._distributed_tracing = distributed_tracing
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        scope["ddtrace_asgi.tracer"] = self.tracer
+
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
@@ -66,7 +68,7 @@ class TraceMiddleware:
         )
         span.set_tag(http_tags.METHOD, method)
         span.set_tag(http_tags.URL, str(url))
-        if config.asgi.trace_query_string:
+        if config.asgi.get("trace_query_string"):
             span.set_tag(http_tags.QUERY_STRING, url.query)
 
         # NOTE: any request header set in the future will not be stored in the span.
