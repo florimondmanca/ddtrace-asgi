@@ -31,7 +31,7 @@ def tracer() -> Tracer:
 
 @pytest.fixture
 def client(tracer: Tracer) -> typing.Iterator[httpx.Client]:
-    app = TraceMiddleware(hello_world, tracer, service="test_app")
+    app = TraceMiddleware(hello_world, tracer=tracer, service="test_app")
     with httpx.Client(app=app, base_url="http://testserver") as client:
         yield client
 

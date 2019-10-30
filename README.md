@@ -24,7 +24,6 @@ To automatically send traces to [Datadog APM](https://docs.datadoghq.com/tracing
 
 ```python
 # app.py
-from ddtrace import tracer
 from ddtrace_asgi.middleware import TraceMiddleware
 
 async def app(scope, receive, send):
@@ -33,7 +32,7 @@ async def app(scope, receive, send):
     await send({"type": "http.response.start", "status": 200, "headers": headers})
     await send({"type": "http.response.body", "body": b"Hello, world!"})
 
-app = TraceMiddleware(app, tracer, service="asgi-hello-world")
+app = TraceMiddleware(app, service="asgi-hello-world")
 ```
 
 Then use `ddtrace-run` when serving your application. For example, if serving with Uvicorn:
@@ -52,12 +51,11 @@ For more information on using `ddtrace`, please see the official [`ddtrace`] rep
 </summary>
 
 ```python
-from ddtrace import tracer
 from ddtrace_asgi.middleware import TraceMiddleware
 from starlette.applications import Starlette
 
 app = Starlette()
-app = TraceMiddleware(app, tracer, service="my-starlette-app")
+app.add_middleware(TraceMiddleware, service="my-starlette-app")
 ```
 
 </details>
@@ -68,7 +66,7 @@ app = TraceMiddleware(app, tracer, service="my-starlette-app")
 
 ```python
 class TracingMiddleware:
-    def __init__(self, app, tracer, service="asgi", distributed_tracing=True):
+    def __init__(self, app, tracer=tracer, service="asgi", distributed_tracing=True):
         ...
 ```
 
@@ -77,7 +75,7 @@ An ASGI middleware that sends traces of HTTP requests to Datadog APM.
 **Parameters**
 
 - **app** - An [ASGI] application.
-- **tracer** - A [`Tracer`] object.
+- **tracer** - _(optional)_ A [`Tracer`] object. Defaults to the global `ddtrace.tracer` object.
 - **service** - _(optional)_ Name of the service as it will appear on Datadog.
 - **distributed_tracing** - _(optional)_ Whether to enable [distributed tracing].
 
