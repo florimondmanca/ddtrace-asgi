@@ -1,9 +1,11 @@
+import os
+
 import nox
 
 nox.options.reuse_existing_virtualenvs = True
 nox.options.stop_on_first_error = True
 
-source_files = ("ddtrace_asgi", "tests", "setup.py", "noxfile.py")
+source_files = (os.path.join("src", "ddtrace_asgi"), "tests", "setup.py", "noxfile.py")
 
 
 @nox.session
