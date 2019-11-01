@@ -1,3 +1,4 @@
+import importlib
 import time
 import typing
 
@@ -8,61 +9,27 @@ from ddtrace.ext import http as http_ext
 from ddtrace.propagation import http as http_propagation
 from ddtrace.span import Span
 from ddtrace.tracer import Tracer
-from starlette.types import Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ddtrace_asgi.middleware import TraceMiddleware
-from tests.utils.asgi import mock_http_scope, mock_receive, mock_send
+from tests.utils.asgi import mock_app, mock_http_scope, mock_receive, mock_send
 from tests.utils.config import override_config
 from tests.utils.tracer import DummyTracer
 
-
-async def hello_world(scope: Scope, receive: Receive, send: Send) -> None:
-    assert scope["type"] == "http"
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 200,
-            "headers": [[b"content-type", b"text/plain"]],
-        }
-    )
-    await send({"type": "http.response.body", "body": b"Hello, world!"})
+# TIP: use 'pytest -k <id>' to run tests for a given application only.
+APPLICATIONS = [
+    pytest.param("tests.applications.raw:application", id="raw"),
+    pytest.param("tests.applications.starlette:application", id="starlette"),
+    pytest.param("tests.applications.fastapi:application", id="fastapi"),
+]
 
 
-async def child(scope: Scope, receive: Receive, send: Send) -> None:
-    assert scope["type"] == "http"
-    tracer: Tracer = scope["ddtrace_asgi.tracer"]
-    with tracer.trace("asgi.request.child", resource="child") as span:
-        span.set_tag("hello", "world")
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [[b"content-type", b"text/plain"]],
-            }
-        )
-        await send({"type": "http.response.body", "body": b"Hello, child!"})
-
-
-async def exception(scope: Scope, receive: Receive, send: Send) -> None:
-    exc = RuntimeError("Oops")
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 500,
-            "headers": [[b"content-type", b"text/plain"]],
-        }
-    )
-    await send({"type": "http.response.body", "body": str(exc).encode()})
-    raise exc
-
-
-async def application(scope: Scope, receive: Receive, send: Send) -> None:
-    if scope["path"] == "/child":
-        await child(scope, receive, send)
-    elif scope["path"] == "/exception":
-        await exception(scope, receive, send)
-    else:
-        await hello_world(scope, receive, send)
+@pytest.fixture(name="application", params=APPLICATIONS)
+def fixture_application(request: typing.Any) -> ASGIApp:
+    module_path, app_name = request.param.split(":")
+    module = importlib.import_module(module_path)
+    app = getattr(module, app_name)
+    return app
 
 
 @pytest.fixture
@@ -71,7 +38,7 @@ def tracer() -> Tracer:
 
 
 @pytest.fixture
-def client(tracer: Tracer) -> typing.Iterator[httpx.Client]:
+def client(application: ASGIApp, tracer: Tracer) -> typing.Iterator[httpx.Client]:
     app = TraceMiddleware(application, tracer=tracer, service="test.asgi.service")
     with httpx.Client(app=app, base_url="http://testserver") as client:
         yield client
@@ -173,12 +140,12 @@ async def test_not_http_no_traces(tracer: Tracer) -> None:
 
 
 def test_default_tracer() -> None:
-    middleware = TraceMiddleware(app=hello_world)
+    middleware = TraceMiddleware(app=mock_app)
     assert middleware.tracer is global_tracer
 
 
 def test_default_service() -> None:
-    middleware = TraceMiddleware(app=hello_world)
+    middleware = TraceMiddleware(app=mock_app)
     assert middleware.service == "asgi"
 
 

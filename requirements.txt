@@ -1,6 +1,7 @@
 -e .
 
 black
+fastapi==0.*
 flake8
 flake8-bugbear
 flake8-comprehensions

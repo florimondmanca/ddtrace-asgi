@@ -1,4 +1,4 @@
-from starlette.types import Message
+from starlette.types import Message, Receive, Scope, Send
 
 mock_http_scope = {
     "type": "http",
@@ -15,3 +15,7 @@ async def mock_receive() -> Message:
 
 async def mock_send(message: Message) -> None:
     pass
+
+
+async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
+    raise NotImplementedError  # pragma: no cover
