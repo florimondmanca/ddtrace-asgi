@@ -55,6 +55,16 @@ app = Starlette()
 app.add_middleware(TraceMiddleware, service="my-starlette-app")
 ```
 
+### FastAPI
+
+```python
+from ddtrace_asgi.middleware import TraceMiddleware
+from fastapi import FastAPI
+
+app = FastAPI()
+app.add_middleware(TraceMiddleware, service="my-fastapi-app")
+```
+
 ## API Reference
 
 ### `TracingMiddleware`
