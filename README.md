@@ -12,6 +12,12 @@ Should work seamlessly for any ASGI web framework, e.g. Starlette, FastAPI, Quar
 
 **Note**: This project is in alpha stage.
 
+## Requirements
+
+- Python 3.6+.
+- [`ddtrace`] must be installed to use the `ddtrace-run` command.
+- The [Datadog Agent](https://docs.datadoghq.com/agent/) must be installed and running for traces to be effectively sent to Datadog APM.
+
 ## Installation
 
 ```bash
