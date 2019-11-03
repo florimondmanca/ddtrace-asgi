@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-export PACKAGE="ddtrace_asgi"
+export PACKAGE="src/ddtrace_asgi"
 
 if [ -d 'dist' ] ; then
     rm -r dist
@@ -10,7 +10,7 @@ if [ -d 'htmlcov' ] ; then
     rm -r htmlcov
 fi
 
-if [ -d '${PACKAGE}.egg-info' ] ; then
+if [ -d "${PACKAGE}.egg-info" ] ; then
     rm -r ${PACKAGE}.egg-info
 fi
 
