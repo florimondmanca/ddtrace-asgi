@@ -1,5 +1,6 @@
 -e .
 
+autoflake
 black
 fastapi==0.*
 flake8
@@ -8,7 +9,7 @@ flake8-comprehensions
 isort
 httpx
 mypy
-nox
 pytest
 pytest-asyncio
 pytest-cov
+seed-isort-config

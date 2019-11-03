@@ -16,8 +16,7 @@ jobs:
   include:
     - python: 3.7
       name: "Check"
-      install: pip install --upgrade nox
-      script: nox -s check
+      script: scripts/check
 
 script:
   - scripts/test
