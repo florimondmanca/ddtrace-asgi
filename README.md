@@ -4,18 +4,16 @@
 [![Coverage](https://codecov.io/gh/florimondmanca/ddtrace-asgi/branch/master/graph/badge.svg)](https://codecov.io/gh/florimondmanca/ddtrace-asgi)
 [![Package version](https://badge.fury.io/py/ddtrace-asgi.svg)](https://pypi.org/project/ddtrace-asgi)
 
-Unofficial [`ddtrace`] integration for ASGI apps and frameworks.
+Unofficial `ddtrace` integration for ASGI apps and frameworks.
 
 Should work seamlessly for any ASGI web framework, e.g. Starlette, FastAPI, Quart, etc.
-
-[`ddtrace`]: https://github.com/DataDog/dd-trace-py
 
 **Note**: This project is in alpha stage.
 
 ## Requirements
 
 - Python 3.6+.
-- [`ddtrace`] must be installed to use the `ddtrace-run` command.
+- [`ddtrace`](https://github.com/DataDog/dd-trace-py) must be installed to use the `ddtrace-run` command.
 - The [Datadog Agent](https://docs.datadoghq.com/agent/) must be installed and running for traces to be effectively sent to Datadog APM.
 
 ## Installation
@@ -38,7 +36,9 @@ async def app(scope, receive, send):
     await send({"type": "http.response.start", "status": 200, "headers": headers})
     await send({"type": "http.response.body", "body": b"Hello, world!"})
 
-app = TraceMiddleware(app, service="asgi-hello-world")
+app = TraceMiddleware(
+    app, service="asgi-hello-world", tags={"env": "local"},
+)
 ```
 
 Then use `ddtrace-run` when serving your application. For example, if serving with Uvicorn:
@@ -47,7 +47,7 @@ Then use `ddtrace-run` when serving your application. For example, if serving wi
 ddtrace-run uvicorn app:app
 ```
 
-For more information on using `ddtrace`, please see the official [`ddtrace`] repository.
+For more information on using `ddtrace`, please see the official [`dd-trace-py`](https://github.com/DataDog/dd-trace-py) repository.
 
 ## Examples
 
@@ -77,7 +77,7 @@ app.add_middleware(TraceMiddleware, service="my-fastapi-app")
 
 ```python
 class TracingMiddleware:
-    def __init__(self, app, tracer=None, service="asgi", distributed_tracing=True):
+    def __init__(self, app, tracer=None, service="asgi", tags=None, distributed_tracing=True):
         ...
 ```
 
@@ -86,10 +86,7 @@ An ASGI middleware that sends traces of HTTP requests to Datadog APM.
 **Parameters**
 
 - **app** - An [ASGI] application.
-- **tracer** - _(optional)_ A [`Tracer`] object. Defaults to the global `ddtrace.tracer` object.
+- **tracer** - _(optional)_ A [`Tracer`](http://pypi.datadoghq.com/trace/docs/advanced_usage.html#tracer) object. Defaults to the global `ddtrace.tracer` object.
 - **service** - _(optional)_ Name of the service as it will appear on Datadog.
-- **distributed_tracing** - _(optional)_ Whether to enable [distributed tracing].
-
-[asgi]: https://asgi.readthedocs.io
-[`tracer`]: http://pypi.datadoghq.com/trace/docs/advanced_usage.html#tracer
-[distributed tracing]: http://pypi.datadoghq.com/trace/docs/advanced_usage.html#distributed-tracing
+- **tags** - _(optional)_ Default tags attached to all request spans. Either a dictionary, or a string of comma-separated tags (e.g. `"env:staging, app:shop"`). See also [Tagging](https://docs.datadoghq.com/tagging/).
+- **distributed_tracing** - _(optional)_ Whether to enable [distributed tracing](http://pypi.datadoghq.com/trace/docs/advanced_usage.html#distributed-tracing).

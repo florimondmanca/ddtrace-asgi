@@ -1,4 +1,4 @@
-from typing import Optional
+import typing
 
 from ddtrace import Tracer, tracer as global_tracer
 from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY
@@ -6,7 +6,7 @@ from ddtrace.ext import http as http_tags
 from ddtrace.http import store_request_headers, store_response_headers
 from ddtrace.propagation.http import HTTPPropagator
 from ddtrace.settings import config
-from starlette.datastructures import Headers
+from starlette.datastructures import CommaSeparatedStrings, Headers
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -16,15 +16,25 @@ class TraceMiddleware:
         self,
         app: ASGIApp,
         *,
-        tracer: Optional[Tracer] = None,
+        tracer: typing.Optional[Tracer] = None,
         service: str = "asgi",
+        tags: typing.Union[str, typing.Dict[str, str]] = None,
         distributed_tracing: bool = True,
     ) -> None:
-        self.app = app
         if tracer is None:
             tracer = global_tracer
+
+        if tags is None:
+            tags = {}
+        if isinstance(tags, str):
+            tags = parse_tags(tags)
+
+        assert isinstance(tags, dict)
+
+        self.app = app
         self.tracer = tracer
         self.service = service
+        self.tags = tags
         self._distributed_tracing = distributed_tracing
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -71,6 +81,9 @@ class TraceMiddleware:
         if config.asgi.get("trace_query_string"):
             span.set_tag(http_tags.QUERY_STRING, url.query)
 
+        for key, value in self.tags.items():
+            span.set_tag(key, value)
+
         # NOTE: any request header set in the future will not be stored in the span.
         store_request_headers(request_headers, span, config.asgi)
 
@@ -94,3 +107,14 @@ class TraceMiddleware:
             raise exc from None
         finally:
             span.finish()
+
+
+def parse_tags(value: str) -> typing.Dict[str, str]:
+    tags = {}
+    for tag in CommaSeparatedStrings(value):
+        key, sep, val = tag.partition(":")
+        if not sep:
+            raise ValueError(f"Invalid tag format: {tag!r}")
+        assert sep
+        tags[key] = val
+    return tags

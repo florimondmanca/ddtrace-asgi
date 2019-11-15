@@ -2,7 +2,7 @@
 
 autoflake
 black
-fastapi==0.*
+fastapi==0.42.*
 flake8
 flake8-bugbear
 flake8-comprehensions
@@ -13,3 +13,4 @@ pytest
 pytest-asyncio
 pytest-cov
 seed-isort-config
+starlette==0.12.9  # See: https://github.com/tiangolo/fastapi/issues/683

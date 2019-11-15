@@ -226,3 +226,51 @@ def test_distributed_tracing(client: httpx.Client, tracer: DummyTracer) -> None:
     span = spans[0]
     assert span.trace_id == 1234
     assert span.parent_id == 5678
+
+
+@pytest.mark.parametrize(
+    "tags, expected_tags",
+    [
+        ("", {}),
+        ({}, {}),
+        ("env:testing", {"env": "testing"}),
+        ({"env": "testing"}, {"env": "testing"}),
+        ({"env": "testing", "live": "false"}, {"env": "testing", "live": "false"}),
+        ("env:testing,live:false", {"env": "testing", "live": "false"}),
+        ("env:testing, live:false", {"env": "testing", "live": "false"}),
+        ("env:staging:east", {"env": "staging:east"}),
+        ("env-testing", ValueError),
+    ],
+)
+def test_tags(
+    application: ASGIApp,
+    tracer: DummyTracer,
+    tags: typing.Union[str, dict],
+    expected_tags: typing.Any,
+) -> None:
+    if expected_tags is ValueError:
+        with pytest.raises(ValueError):
+            TraceMiddleware(application, tags=tags)
+        return
+
+    assert isinstance(expected_tags, dict)
+
+    app = TraceMiddleware(
+        application, tracer=tracer, service="test.asgi.service", tags=tags,
+    )
+
+    with httpx.Client(app=app, base_url="http://testserver") as client:
+        r = client.get("/example")
+        assert r.status_code == 200
+        assert r.text == "Hello, world!"
+
+        traces = tracer.writer.pop_traces()
+        assert len(traces) == 1
+        spans: typing.List[Span] = traces[0]
+        assert len(spans) == 1
+        span = spans[0]
+        assert span.name == "asgi.request"
+        assert span.service == "test.asgi.service"
+        assert span.resource == "GET /example"
+        for key, value in expected_tags.items():
+            assert span.get_tag(key) == value
