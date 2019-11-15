@@ -85,7 +85,7 @@ An ASGI middleware that sends traces of HTTP requests to Datadog APM.
 
 **Parameters**
 
-- **app** - An [ASGI] application.
+- **app** - An [ASGI](https://asgi.readthedocs.io) application.
 - **tracer** - _(optional)_ A [`Tracer`](http://pypi.datadoghq.com/trace/docs/advanced_usage.html#tracer) object. Defaults to the global `ddtrace.tracer` object.
 - **service** - _(optional)_ Name of the service as it will appear on Datadog.
 - **tags** - _(optional)_ Default tags attached to all request spans. Either a dictionary, or a string of comma-separated tags (e.g. `"env:staging, app:shop"`). See also [Tagging](https://docs.datadoghq.com/tagging/).
