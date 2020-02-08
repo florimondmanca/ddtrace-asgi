@@ -38,14 +38,17 @@ def tracer() -> Tracer:
 
 
 @pytest.fixture
-def client(application: ASGIApp, tracer: Tracer) -> typing.Iterator[httpx.Client]:
+async def client(
+    application: ASGIApp, tracer: Tracer
+) -> typing.AsyncIterator[httpx.AsyncClient]:
     app = TraceMiddleware(application, tracer=tracer, service="test.asgi.service")
-    with httpx.Client(app=app, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(app=app, base_url="http://testserver") as client:
         yield client
 
 
-def test_app(client: httpx.Client, tracer: DummyTracer) -> None:
-    r = client.get("/example")
+@pytest.mark.asyncio
+async def test_app(client: httpx.AsyncClient, tracer: DummyTracer) -> None:
+    r = await client.get("/example")
     assert r.status_code == 200
     assert r.text == "Hello, world!"
 
@@ -85,9 +88,10 @@ async def test_invalid_asgi(tracer: Tracer) -> None:
     await app(mock_http_scope, mock_receive, mock_send)
 
 
-def test_child(client: httpx.Client, tracer: Tracer) -> None:
+@pytest.mark.asyncio
+async def test_child(client: httpx.AsyncClient, tracer: Tracer) -> None:
     start = time.time()
-    r = client.get("/child")
+    r = await client.get("/child")
     end = time.time()
     assert r.status_code == 200
     assert r.text == "Hello, child!"
@@ -172,9 +176,12 @@ def trace_query_string() -> typing.Iterator[None]:
         yield
 
 
+@pytest.mark.asyncio
 @pytest.mark.usefixtures("trace_query_string")
-def test_trace_query_string(client: httpx.Client, tracer: DummyTracer) -> None:
-    r = client.get("/example", params={"foo": "bar"})
+async def test_trace_query_string(
+    client: httpx.AsyncClient, tracer: DummyTracer
+) -> None:
+    r = await client.get("/example", params={"foo": "bar"})
     assert r.status_code == 200
     assert r.text == "Hello, world!"
 
@@ -186,10 +193,11 @@ def test_trace_query_string(client: httpx.Client, tracer: DummyTracer) -> None:
     assert span.get_tag(http_ext.QUERY_STRING) == "foo=bar"
 
 
-def test_app_exception(client: httpx.Client, tracer: DummyTracer) -> None:
+@pytest.mark.asyncio
+async def test_app_exception(client: httpx.AsyncClient, tracer: DummyTracer) -> None:
     with pytest.raises(RuntimeError):
         start = time.time()
-        client.get("/exception")
+        await client.get("/exception")
     end = time.time()
 
     # Ensure any open span was closed.
@@ -210,12 +218,15 @@ def test_app_exception(client: httpx.Client, tracer: DummyTracer) -> None:
     assert span.get_tag(http_ext.METHOD) == "GET"
 
 
-def test_distributed_tracing(client: httpx.Client, tracer: DummyTracer) -> None:
+@pytest.mark.asyncio
+async def test_distributed_tracing(
+    client: httpx.AsyncClient, tracer: DummyTracer
+) -> None:
     headers = {
         http_propagation.HTTP_HEADER_TRACE_ID: "1234",
         http_propagation.HTTP_HEADER_PARENT_ID: "5678",
     }
-    r = client.get("/example", headers=headers)
+    r = await client.get("/example", headers=headers)
     assert r.status_code == 200
     assert r.text == "Hello, world!"
 
@@ -228,6 +239,7 @@ def test_distributed_tracing(client: httpx.Client, tracer: DummyTracer) -> None:
     assert span.parent_id == 5678
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "tags, expected_tags",
     [
@@ -242,7 +254,7 @@ def test_distributed_tracing(client: httpx.Client, tracer: DummyTracer) -> None:
         ("env-testing", ValueError),
     ],
 )
-def test_tags(
+async def test_tags(
     application: ASGIApp,
     tracer: DummyTracer,
     tags: typing.Union[str, dict],
@@ -259,8 +271,8 @@ def test_tags(
         application, tracer=tracer, service="test.asgi.service", tags=tags,
     )
 
-    with httpx.Client(app=app, base_url="http://testserver") as client:
-        r = client.get("/example")
+    async with httpx.AsyncClient(app=app, base_url="http://testserver") as client:
+        r = await client.get("/example")
         assert r.status_code == 200
         assert r.text == "Hello, world!"
 

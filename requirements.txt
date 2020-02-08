@@ -7,7 +7,7 @@ flake8
 flake8-bugbear
 flake8-comprehensions
 isort
-httpx
+httpx==0.11.*
 mypy
 pytest
 pytest-asyncio
