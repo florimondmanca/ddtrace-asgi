@@ -18,10 +18,8 @@ async def test_custom_trace_backend(application: str, tracer: Tracer) -> None:
             # Add tags from initial scope data.
             span.set_tags(scope.get("dd_tags", {}))
 
-        def on_http_response_start(
-            self, span: Span, scope: Scope, message: Message
-        ) -> None:
-            super().on_http_response_start(span, scope, message)
+        def on_http_response(self, span: Span, scope: Scope, message: Message) -> None:
+            super().on_http_response(span, scope, message)
 
             # Set a tag using the ASGI message.
             is_redirect = 300 <= message["status"] < 400

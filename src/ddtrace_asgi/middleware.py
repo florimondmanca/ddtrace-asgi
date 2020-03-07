@@ -47,9 +47,7 @@ class TraceBackend:
             self.config.get_analytics_sample_rate(use_global_config=True),
         )
 
-    def on_http_response_start(
-        self, span: Span, scope: Scope, message: Message
-    ) -> None:
+    def on_http_response(self, span: Span, scope: Scope, message: Message) -> None:
         """
         Called just before sending the HTTP response returned by the underlying
         ASGI app.
@@ -105,7 +103,7 @@ class TraceMiddleware:
         span = self.tracer.current_span()
 
         if span is not None and message.get("type") == "http.response.start":
-            self.backend.on_http_response_start(span, scope, message)
+            self.backend.on_http_response(span, scope, message)
 
         await send(message)
 
