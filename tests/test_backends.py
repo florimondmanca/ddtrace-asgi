@@ -31,7 +31,7 @@ async def test_custom_trace_backend(application: str, tracer: Tracer) -> None:
             # by the underlying ASGI app.
             span.set_tags(scope.get("dd_tags", {}))
 
-    class InjectInScopeMiddleware:
+    class UpdateScopeMiddleware:
         def __init__(self, app: ASGIApp, **kwargs: Any) -> None:
             self.app = app
             self.kwargs = kwargs
@@ -44,13 +44,13 @@ async def test_custom_trace_backend(application: str, tracer: Tracer) -> None:
     app = create_app(
         application,
         middleware=[
-            (InjectInScopeMiddleware, {"dd_tags": {"session_id": "123abc"}}),
+            (UpdateScopeMiddleware, {"dd_tags": {"session_id": "123abc"}}),
             (
                 TraceMiddleware,
                 {"tracer": tracer, "service": "test.asgi.service", "backend": backend},
             ),
             (
-                InjectInScopeMiddleware,
+                UpdateScopeMiddleware,
                 {"dd_tags": {"url_pattern": "/tickets/{ticket_id:int}/"}},
             ),
         ],
