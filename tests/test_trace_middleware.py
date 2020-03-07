@@ -10,7 +10,7 @@ from ddtrace.span import Span
 from ddtrace.tracer import Tracer
 from starlette.types import Message, Receive, Scope, Send
 
-from ddtrace_asgi.middleware import TraceMiddleware
+import ddtrace_asgi
 from tests.utils.asgi import mock_app, mock_http_scope, mock_receive, mock_send
 from tests.utils.config import override_config
 from tests.utils.fixtures import create_app
@@ -22,7 +22,10 @@ async def test_app(application: str, tracer: DummyTracer) -> None:
     app = create_app(
         application,
         middleware=[
-            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+            (
+                ddtrace_asgi.TraceMiddleware,
+                {"tracer": tracer, "service": "test.asgi.service"},
+            )
         ],
     )
 
@@ -58,7 +61,7 @@ async def test_invalid_asgi(tracer: Tracer) -> None:
             message.pop(key)
             await send(message)
 
-    app = TraceMiddleware(invalid, tracer=tracer)
+    app = ddtrace_asgi.TraceMiddleware(invalid, tracer=tracer)
 
     for key in "method", "path", "headers", "query_string":
         scope = dict(mock_http_scope)
@@ -73,7 +76,10 @@ async def test_child(application: str, tracer: Tracer) -> None:
     app = create_app(
         application,
         middleware=[
-            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+            (
+                ddtrace_asgi.TraceMiddleware,
+                {"tracer": tracer, "service": "test.asgi.service"},
+            )
         ],
     )
 
@@ -119,7 +125,7 @@ async def test_not_http_no_traces(tracer: Tracer) -> None:
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
         pass
 
-    app = TraceMiddleware(app)
+    app = ddtrace_asgi.TraceMiddleware(app)
 
     scope = {"type": "lifespan"}
     await app(scope, mock_receive, mock_send)
@@ -133,12 +139,12 @@ async def test_not_http_no_traces(tracer: Tracer) -> None:
 
 
 def test_default_tracer() -> None:
-    middleware = TraceMiddleware(app=mock_app)
+    middleware = ddtrace_asgi.TraceMiddleware(app=mock_app)
     assert middleware.tracer is global_tracer
 
 
 def test_default_service() -> None:
-    middleware = TraceMiddleware(app=mock_app)
+    middleware = ddtrace_asgi.TraceMiddleware(app=mock_app)
     assert middleware.service == "asgi"
 
 
@@ -153,7 +159,7 @@ async def test_tracer_scope_item(tracer: Tracer) -> None:
     async def send(message: Message) -> None:
         messages.append(message)
 
-    app = TraceMiddleware(spy_app, tracer=tracer)
+    app = ddtrace_asgi.TraceMiddleware(spy_app, tracer=tracer)
     await app(scope=mock_http_scope, receive=mock_receive, send=send)
 
     assert messages == [{"tracer": tracer}]
@@ -171,7 +177,10 @@ async def test_trace_query_string(application: str, tracer: DummyTracer) -> None
     app = create_app(
         application,
         middleware=[
-            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+            (
+                ddtrace_asgi.TraceMiddleware,
+                {"tracer": tracer, "service": "test.asgi.service"},
+            )
         ],
     )
 
@@ -194,7 +203,10 @@ async def test_app_exception(application: str, tracer: DummyTracer) -> None:
     app = create_app(
         application,
         middleware=[
-            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+            (
+                ddtrace_asgi.TraceMiddleware,
+                {"tracer": tracer, "service": "test.asgi.service"},
+            )
         ],
     )
 
@@ -225,7 +237,10 @@ async def test_distributed_tracing(application: str, tracer: DummyTracer) -> Non
     app = create_app(
         application,
         middleware=[
-            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+            (
+                ddtrace_asgi.TraceMiddleware,
+                {"tracer": tracer, "service": "test.asgi.service"},
+            )
         ],
     )
 
@@ -271,7 +286,7 @@ async def test_tags(
         application,
         middleware=[
             (
-                TraceMiddleware,
+                ddtrace_asgi.TraceMiddleware,
                 {"tracer": tracer, "service": "test.asgi.service", "tags": tags},
             )
         ],
@@ -293,12 +308,3 @@ async def test_tags(
     assert span.resource == "GET /"
     for key, value in expected_tags.items():
         assert span.get_tag(key) == value
-
-
-@pytest.mark.parametrize(
-    "tags", ["", "env:testing"],
-)
-def test_tags_deprecated(tags: Union[str, dict]) -> None:
-    app = create_app("raw")
-    with pytest.deprecated_call():
-        TraceMiddleware(app, tags=tags)

@@ -28,7 +28,7 @@ To automatically send traces to [Datadog APM](https://docs.datadoghq.com/tracing
 
 ```python
 # app.py
-from ddtrace_asgi.middleware import TraceMiddleware
+from ddtrace_asgi import TraceMiddleware
 
 async def app(scope, receive, send):
     assert scope["type"] == "http"
@@ -52,7 +52,7 @@ For more information on using `ddtrace`, please see the official [`dd-trace-py`]
 ### Starlette
 
 ```python
-from ddtrace_asgi.middleware import TraceMiddleware
+from ddtrace_asgi import TraceMiddleware
 from starlette.applications import Starlette
 
 app = Starlette()
@@ -62,7 +62,7 @@ app.add_middleware(TraceMiddleware, service="my-starlette-app")
 ### FastAPI
 
 ```python
-from ddtrace_asgi.middleware import TraceMiddleware
+from ddtrace_asgi import TraceMiddleware
 from fastapi import FastAPI
 
 app = FastAPI()
