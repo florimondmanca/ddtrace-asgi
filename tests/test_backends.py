@@ -13,8 +13,8 @@ from tests.utils.fixtures import create_app
 @pytest.mark.asyncio
 async def test_custom_trace_backend(application: str, tracer: Tracer) -> None:
     class CustomTraceBackend(TraceBackend):
-        def initialize(self, span: Span, scope: Scope) -> None:
-            super().initialize(span, scope)
+        def on_http_request(self, span: Span, scope: Scope) -> None:
+            super().on_http_request(span, scope)
             # Add tags from initial scope data.
             span.set_tags(scope.get("dd_tags", {}))
 

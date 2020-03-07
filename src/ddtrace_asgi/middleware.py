@@ -15,7 +15,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 class TraceBackend:
     config: IntegrationConfig = global_config.asgi
 
-    def initialize(self, span: Span, scope: Scope) -> None:
+    def on_http_request(self, span: Span, scope: Scope) -> None:
+        """
+        Called just before dispatching an incoming HTTP request to the underlying
+        ASGI app.
+        """
+        assert scope["type"] == "http"
+
         try:
             method = scope["method"]
             url = URL(scope=scope)
@@ -44,9 +50,16 @@ class TraceBackend:
     def on_http_response_start(
         self, span: Span, scope: Scope, message: Message
     ) -> None:
+        """
+        Called just before sending the HTTP response returned by the underlying
+        ASGI app.
+        """
+        assert message["type"] == "http.response.start"
+
         if "status" in message:
             status_code: int = message["status"]
             span.set_tag(http_tags.STATUS_CODE, str(status_code))
+
         if "headers" in message:
             response_headers = Headers(raw=message["headers"])
             # NOTE: any header set in the future will not be stored in the span.
@@ -90,8 +103,10 @@ class TraceMiddleware:
         self, send: Send, scope: Scope, message: Message
     ) -> None:
         span = self.tracer.current_span()
+
         if span is not None and message.get("type") == "http.response.start":
             self.backend.on_http_response_start(span, scope, message)
+
         await send(message)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -101,30 +116,21 @@ class TraceMiddleware:
             await self.app(scope, receive, send)
             return
 
-        if self._distributed_tracing:
+        if "headers" in scope and self._distributed_tracing:
             propagator = HTTPPropagator()
-            headers = Headers(raw=scope.get("headers", []))
+            headers = Headers(raw=scope["headers"])
             context = propagator.extract(headers)
             if context.trace_id:
                 self.tracer.context_provider.activate(context)
 
-        span = self.tracer.trace(
+        with self.tracer.trace(
             name="asgi.request", service=self.service, span_type=http_tags.TYPE,
-        )
+        ) as span:
+            span.set_tags(self.tags)
+            self.backend.on_http_request(span, scope)
 
-        self.backend.initialize(span, scope)
-
-        span.set_tags(self.tags)
-
-        send = functools.partial(self.send_with_tracing, send, scope)
-
-        try:
+            send = functools.partial(self.send_with_tracing, send, scope)
             await self.app(scope, receive, send)
-        except BaseException as exc:
-            span.set_traceback()
-            raise exc from None
-        finally:
-            span.finish()
 
 
 def parse_tags_from_list(tags: Sequence[str]) -> Dict[str, str]:
