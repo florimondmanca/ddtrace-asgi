@@ -1,5 +1,6 @@
-import typing
+from typing import Dict, Mapping, Optional, Sequence, Union
 
+import deprecation
 from ddtrace import Tracer, tracer as global_tracer
 from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY
 from ddtrace.ext import http as http_tags
@@ -16,18 +17,20 @@ class TraceMiddleware:
         self,
         app: ASGIApp,
         *,
-        tracer: typing.Optional[Tracer] = None,
+        tracer: Optional[Tracer] = None,
         service: str = "asgi",
-        tags: typing.Union[str, typing.Dict[str, str]] = None,
+        tags: Union[Mapping[str, str], Sequence[str]] = None,
         distributed_tracing: bool = True,
     ) -> None:
         if tracer is None:
             tracer = global_tracer
 
         if tags is None:
-            tags = {}
+            tags = []
         if isinstance(tags, str):
-            tags = parse_tags(tags)
+            tags = parse_tags_from_string(tags)
+        elif isinstance(tags, list):
+            tags = parse_tags_from_list(tags)
 
         assert isinstance(tags, dict)
 
@@ -81,8 +84,7 @@ class TraceMiddleware:
         if config.asgi.get("trace_query_string"):
             span.set_tag(http_tags.QUERY_STRING, url.query)
 
-        for key, value in self.tags.items():
-            span.set_tag(key, value)
+        span.set_tags(self.tags)
 
         # NOTE: any request header set in the future will not be stored in the span.
         store_request_headers(request_headers, span, config.asgi)
@@ -109,12 +111,23 @@ class TraceMiddleware:
             span.finish()
 
 
-def parse_tags(value: str) -> typing.Dict[str, str]:
-    tags = {}
-    for tag in CommaSeparatedStrings(value):
-        key, sep, val = tag.partition(":")
-        if not sep:
-            raise ValueError(f"Invalid tag format: {tag!r}")
-        assert sep
-        tags[key] = val
-    return tags
+def parse_tags_from_list(tags: Sequence[str]) -> Dict[str, str]:
+    parsed: Dict[str, str] = {}
+
+    for tag in tags:
+        name, _, value = tag.partition(":")
+        parsed[name] = value
+
+    return parsed
+
+
+@deprecation.deprecated(
+    deprecated_in="0.4.0",
+    removed_in="0.5.0",
+    details=(
+        "Pass a list or dict instead. "
+        "You can use starlette.datastructures.CommaSeparatedStrings for parsing."
+    ),
+)
+def parse_tags_from_string(value: str) -> Dict[str, str]:
+    return parse_tags_from_list(CommaSeparatedStrings(value))

@@ -30,7 +30,7 @@ setup(
     package_dir={"": "src"},
     include_package_data=True,
     zip_safe=False,
-    install_requires=["ddtrace", "starlette==0.*"],
+    install_requires=["ddtrace", "starlette==0.*", "deprecation==2.*"],
     python_requires=">=3.6",
     license="BSD",
     classifiers=[
