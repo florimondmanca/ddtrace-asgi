@@ -1,5 +1,7 @@
+from typing import Sequence, Tuple
+
 from ddtrace import Tracer
-from starlette.types import Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 async def home(scope: Scope, receive: Receive, send: Send) -> None:
@@ -42,10 +44,16 @@ async def exception(scope: Scope, receive: Receive, send: Send) -> None:
     raise exc
 
 
-async def app(scope: Scope, receive: Receive, send: Send) -> None:
-    if scope["path"] == "/child":
-        await child(scope, receive, send)
-    elif scope["path"] == "/exception":
-        await exception(scope, receive, send)
-    else:
-        await home(scope, receive, send)
+def create_app(middleware: Sequence[Tuple[type, dict]]) -> ASGIApp:
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["path"] == "/child/":
+            await child(scope, receive, send)
+        elif scope["path"] == "/exception/":
+            await exception(scope, receive, send)
+        else:
+            await home(scope, receive, send)
+
+    for cls, options in middleware:
+        app = cls(app, **options)
+
+    return app

@@ -8,17 +8,23 @@ from ddtrace.ext import http as http_ext
 from ddtrace.propagation import http as http_propagation
 from ddtrace.span import Span
 from ddtrace.tracer import Tracer
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import Message, Receive, Scope, Send
 
 from ddtrace_asgi.middleware import TraceMiddleware
 from tests.utils.asgi import mock_app, mock_http_scope, mock_receive, mock_send
 from tests.utils.config import override_config
+from tests.utils.fixtures import create_app
 from tests.utils.tracer import DummyTracer
 
 
 @pytest.mark.asyncio
-async def test_app(app: ASGIApp, tracer: DummyTracer) -> None:
-    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+async def test_app(application: str, tracer: DummyTracer) -> None:
+    app = create_app(
+        application,
+        middleware=[
+            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+        ],
+    )
 
     async with httpx.AsyncClient(app=app) as client:
         r = await client.get("http://testserver/")
@@ -63,12 +69,17 @@ async def test_invalid_asgi(tracer: Tracer) -> None:
 
 
 @pytest.mark.asyncio
-async def test_child(app: ASGIApp, tracer: Tracer) -> None:
-    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+async def test_child(application: str, tracer: Tracer) -> None:
+    app = create_app(
+        application,
+        middleware=[
+            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+        ],
+    )
 
     async with httpx.AsyncClient(app=app) as client:
         start = time.time()
-        r = await client.get("http://testserver/child")
+        r = await client.get("http://testserver/child/")
         end = time.time()
 
     assert r.status_code == 200
@@ -85,7 +96,7 @@ async def test_child(app: ASGIApp, tracer: Tracer) -> None:
     assert span.trace_id
     assert span.parent_id is None
     assert span.service == "test.asgi.service"
-    assert span.resource == "GET /child"
+    assert span.resource == "GET /child/"
     assert span.get_tag("hello") is None
     assert span.start >= start
     assert span.duration <= end - start
@@ -156,8 +167,13 @@ def trace_query_string() -> typing.Iterator[None]:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("trace_query_string")
-async def test_trace_query_string(app: ASGIApp, tracer: DummyTracer) -> None:
-    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+async def test_trace_query_string(application: str, tracer: DummyTracer) -> None:
+    app = create_app(
+        application,
+        middleware=[
+            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+        ],
+    )
 
     async with httpx.AsyncClient(app=app) as client:
         r = await client.get("http://testserver/", params={"foo": "bar"})
@@ -174,13 +190,18 @@ async def test_trace_query_string(app: ASGIApp, tracer: DummyTracer) -> None:
 
 
 @pytest.mark.asyncio
-async def test_app_exception(app: ASGIApp, tracer: DummyTracer) -> None:
-    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+async def test_app_exception(application: str, tracer: DummyTracer) -> None:
+    app = create_app(
+        application,
+        middleware=[
+            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+        ],
+    )
 
     async with httpx.AsyncClient(app=app) as client:
         with pytest.raises(RuntimeError):
             start = time.time()
-            _ = await client.get("http://testserver/exception")
+            _ = await client.get("http://testserver/exception/")
         end = time.time()
 
     # Ensure any open span was closed.
@@ -193,17 +214,20 @@ async def test_app_exception(app: ASGIApp, tracer: DummyTracer) -> None:
     span = spans[0]
     assert span.name == "asgi.request"
     assert span.service == "test.asgi.service"
-    assert span.resource == "GET /exception"
+    assert span.resource == "GET /exception/"
     assert span.start >= start
     assert span.duration <= end - start
     assert span.error == 1
-    assert span.get_tag(http_ext.STATUS_CODE) == "500"
-    assert span.get_tag(http_ext.METHOD) == "GET"
 
 
 @pytest.mark.asyncio
-async def test_distributed_tracing(app: ASGIApp, tracer: DummyTracer) -> None:
-    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+async def test_distributed_tracing(application: str, tracer: DummyTracer) -> None:
+    app = create_app(
+        application,
+        middleware=[
+            (TraceMiddleware, {"tracer": tracer, "service": "test.asgi.service"})
+        ],
+    )
 
     headers = {
         http_propagation.HTTP_HEADER_TRACE_ID: "1234",
@@ -241,19 +265,29 @@ async def test_distributed_tracing(app: ASGIApp, tracer: DummyTracer) -> None:
     ],
 )
 async def test_tags(
-    app: ASGIApp,
+    application: str,
     tracer: DummyTracer,
     tags: typing.Union[str, dict],
     expected_tags: typing.Any,
 ) -> None:
     if expected_tags is ValueError:
         with pytest.raises(ValueError):
-            TraceMiddleware(app, tags=tags)
+            app = create_app(
+                application, middleware=[(TraceMiddleware, {"tags": tags})],
+            )
         return
 
     assert isinstance(expected_tags, dict)
 
-    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service", tags=tags)
+    app = create_app(
+        application,
+        middleware=[
+            (
+                TraceMiddleware,
+                {"tracer": tracer, "service": "test.asgi.service", "tags": tags},
+            )
+        ],
+    )
 
     async with httpx.AsyncClient(app=app) as client:
         r = await client.get("http://testserver/")
