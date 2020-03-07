@@ -1,4 +1,3 @@
-import importlib
 import time
 import typing
 
@@ -16,39 +15,14 @@ from tests.utils.asgi import mock_app, mock_http_scope, mock_receive, mock_send
 from tests.utils.config import override_config
 from tests.utils.tracer import DummyTracer
 
-# TIP: use 'pytest -k <id>' to run tests for a given application only.
-APPLICATIONS = [
-    pytest.param("tests.applications.raw:application", id="raw"),
-    pytest.param("tests.applications.starlette:application", id="starlette"),
-    pytest.param("tests.applications.fastapi:application", id="fastapi"),
-]
-
-
-@pytest.fixture(name="application", params=APPLICATIONS)
-def fixture_application(request: typing.Any) -> ASGIApp:
-    module_path, app_name = request.param.split(":")
-    module = importlib.import_module(module_path)
-    app = getattr(module, app_name)
-    return app
-
-
-@pytest.fixture
-def tracer() -> Tracer:
-    return DummyTracer()
-
-
-@pytest.fixture
-async def client(
-    application: ASGIApp, tracer: Tracer
-) -> typing.AsyncIterator[httpx.AsyncClient]:
-    app = TraceMiddleware(application, tracer=tracer, service="test.asgi.service")
-    async with httpx.AsyncClient(app=app, base_url="http://testserver") as client:
-        yield client
-
 
 @pytest.mark.asyncio
-async def test_app(client: httpx.AsyncClient, tracer: DummyTracer) -> None:
-    r = await client.get("/example")
+async def test_app(app: ASGIApp, tracer: DummyTracer) -> None:
+    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+
+    async with httpx.AsyncClient(app=app) as client:
+        r = await client.get("http://testserver/")
+
     assert r.status_code == 200
     assert r.text == "Hello, world!"
 
@@ -62,9 +36,9 @@ async def test_app(client: httpx.AsyncClient, tracer: DummyTracer) -> None:
     assert span.parent_id is None
     assert span.name == "asgi.request"
     assert span.service == "test.asgi.service"
-    assert span.resource == "GET /example"
+    assert span.resource == "GET /"
     assert span.get_tag(http_ext.STATUS_CODE) == "200"
-    assert span.get_tag(http_ext.URL) == "http://testserver/example"
+    assert span.get_tag(http_ext.URL) == "http://testserver/"
     assert span.get_tag(http_ext.QUERY_STRING) is None
 
 
@@ -89,10 +63,14 @@ async def test_invalid_asgi(tracer: Tracer) -> None:
 
 
 @pytest.mark.asyncio
-async def test_child(client: httpx.AsyncClient, tracer: Tracer) -> None:
-    start = time.time()
-    r = await client.get("/child")
-    end = time.time()
+async def test_child(app: ASGIApp, tracer: Tracer) -> None:
+    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+
+    async with httpx.AsyncClient(app=app) as client:
+        start = time.time()
+        r = await client.get("http://testserver/child")
+        end = time.time()
+
     assert r.status_code == 200
     assert r.text == "Hello, child!"
 
@@ -178,10 +156,12 @@ def trace_query_string() -> typing.Iterator[None]:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("trace_query_string")
-async def test_trace_query_string(
-    client: httpx.AsyncClient, tracer: DummyTracer
-) -> None:
-    r = await client.get("/example", params={"foo": "bar"})
+async def test_trace_query_string(app: ASGIApp, tracer: DummyTracer) -> None:
+    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+
+    async with httpx.AsyncClient(app=app) as client:
+        r = await client.get("http://testserver/", params={"foo": "bar"})
+
     assert r.status_code == 200
     assert r.text == "Hello, world!"
 
@@ -194,11 +174,14 @@ async def test_trace_query_string(
 
 
 @pytest.mark.asyncio
-async def test_app_exception(client: httpx.AsyncClient, tracer: DummyTracer) -> None:
-    with pytest.raises(RuntimeError):
-        start = time.time()
-        await client.get("/exception")
-    end = time.time()
+async def test_app_exception(app: ASGIApp, tracer: DummyTracer) -> None:
+    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+
+    async with httpx.AsyncClient(app=app) as client:
+        with pytest.raises(RuntimeError):
+            start = time.time()
+            _ = await client.get("http://testserver/exception")
+        end = time.time()
 
     # Ensure any open span was closed.
     assert not tracer.current_span()
@@ -219,14 +202,17 @@ async def test_app_exception(client: httpx.AsyncClient, tracer: DummyTracer) -> 
 
 
 @pytest.mark.asyncio
-async def test_distributed_tracing(
-    client: httpx.AsyncClient, tracer: DummyTracer
-) -> None:
+async def test_distributed_tracing(app: ASGIApp, tracer: DummyTracer) -> None:
+    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service")
+
     headers = {
         http_propagation.HTTP_HEADER_TRACE_ID: "1234",
         http_propagation.HTTP_HEADER_PARENT_ID: "5678",
     }
-    r = await client.get("/example", headers=headers)
+
+    async with httpx.AsyncClient(app=app) as client:
+        r = await client.get("http://testserver/", headers=headers)
+
     assert r.status_code == 200
     assert r.text == "Hello, world!"
 
@@ -255,24 +241,22 @@ async def test_distributed_tracing(
     ],
 )
 async def test_tags(
-    application: ASGIApp,
+    app: ASGIApp,
     tracer: DummyTracer,
     tags: typing.Union[str, dict],
     expected_tags: typing.Any,
 ) -> None:
     if expected_tags is ValueError:
         with pytest.raises(ValueError):
-            TraceMiddleware(application, tags=tags)
+            TraceMiddleware(app, tags=tags)
         return
 
     assert isinstance(expected_tags, dict)
 
-    app = TraceMiddleware(
-        application, tracer=tracer, service="test.asgi.service", tags=tags,
-    )
+    app = TraceMiddleware(app, tracer=tracer, service="test.asgi.service", tags=tags)
 
-    async with httpx.AsyncClient(app=app, base_url="http://testserver") as client:
-        r = await client.get("/example")
+    async with httpx.AsyncClient(app=app) as client:
+        r = await client.get("http://testserver/")
         assert r.status_code == 200
         assert r.text == "Hello, world!"
 
@@ -283,6 +267,6 @@ async def test_tags(
         span = spans[0]
         assert span.name == "asgi.request"
         assert span.service == "test.asgi.service"
-        assert span.resource == "GET /example"
+        assert span.resource == "GET /"
         for key, value in expected_tags.items():
             assert span.get_tag(key) == value

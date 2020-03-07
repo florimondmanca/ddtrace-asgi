@@ -2,7 +2,7 @@ from ddtrace import Tracer
 from starlette.types import Receive, Scope, Send
 
 
-async def hello_world(scope: Scope, receive: Receive, send: Send) -> None:
+async def home(scope: Scope, receive: Receive, send: Send) -> None:
     assert scope["type"] == "http"
     await send(
         {
@@ -42,10 +42,10 @@ async def exception(scope: Scope, receive: Receive, send: Send) -> None:
     raise exc
 
 
-async def application(scope: Scope, receive: Receive, send: Send) -> None:
+async def app(scope: Scope, receive: Receive, send: Send) -> None:
     if scope["path"] == "/child":
         await child(scope, receive, send)
     elif scope["path"] == "/exception":
         await exception(scope, receive, send)
     else:
-        await hello_world(scope, receive, send)
+        await home(scope, receive, send)

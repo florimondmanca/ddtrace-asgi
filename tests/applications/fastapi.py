@@ -5,15 +5,15 @@ from fastapi import FastAPI
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-application = FastAPI()
+app = FastAPI()
 
 
-@application.get("/example", response_class=PlainTextResponse)
-async def example() -> str:
+@app.get("/", response_class=PlainTextResponse)
+async def home() -> str:
     return "Hello, world!"
 
 
-@application.get("/child", response_class=PlainTextResponse)
+@app.get("/child", response_class=PlainTextResponse)
 async def child(request: Request) -> str:
     tracer: Tracer = request["ddtrace_asgi.tracer"]
     with tracer.trace("asgi.request.child", resource="child") as span:
@@ -21,6 +21,6 @@ async def child(request: Request) -> str:
         return "Hello, child!"
 
 
-@application.get("/exception")
+@app.get("/exception")
 async def exception() -> typing.NoReturn:
     raise RuntimeError("Oops")
