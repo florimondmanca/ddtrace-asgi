@@ -17,7 +17,6 @@ class TraceBackend:
 
     def initialize(self, span: Span, scope: Scope) -> None:
         try:
-            raw_headers = scope["headers"]
             method = scope["method"]
             url = URL(scope=scope)
         except KeyError:
@@ -25,7 +24,7 @@ class TraceBackend:
             span.set_tag(MANUAL_DROP_KEY)
             return
 
-        headers = Headers(raw=raw_headers)
+        headers = Headers(raw=scope.get("headers", []))
 
         # NOTE: any header set in the future will not be stored in the span.
         store_request_headers(headers, span, self.config)
@@ -102,11 +101,10 @@ class TraceMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request_headers = Headers(raw=scope.get("headers", []))
-
         if self._distributed_tracing:
             propagator = HTTPPropagator()
-            context = propagator.extract(request_headers)
+            headers = Headers(raw=scope.get("headers", []))
+            context = propagator.extract(headers)
             if context.trace_id:
                 self.tracer.context_provider.activate(context)
 
