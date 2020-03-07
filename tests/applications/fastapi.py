@@ -21,10 +21,6 @@ def create_app(middleware: Sequence[Tuple[type, dict]]) -> ASGIApp:
             span.set_tag("hello", "world")
             return "Hello, child!"
 
-    @app.get("/shows/{pk:int}/")
-    async def get_show(pk: int) -> dict:
-        return {"id": pk, "title": "PyCon"}
-
     @app.get("/exception/")
     async def exception() -> NoReturn:
         raise RuntimeError("Oops")
