@@ -1,6 +1,7 @@
 import functools
-import typing
+from typing import Dict, Mapping, Optional, Sequence, Union
 
+import deprecation
 from ddtrace import Span, Tracer, tracer as global_tracer
 from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY, MANUAL_DROP_KEY
 from ddtrace.ext import http as http_tags
@@ -14,7 +15,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 class TraceBackend:
     config: IntegrationConfig = global_config.asgi
 
-    def init_span(self, span: Span, scope: Scope) -> None:
+    def initialize(self, span: Span, scope: Scope) -> None:
         try:
             raw_headers = scope["headers"]
             method = scope["method"]
@@ -41,7 +42,9 @@ class TraceBackend:
             self.config.get_analytics_sample_rate(use_global_config=True),
         )
 
-    def on_http_response_start(self, span: Span, message: Message) -> None:
+    def on_http_response_start(
+        self, span: Span, scope: Scope, message: Message
+    ) -> None:
         if "status" in message:
             status_code: int = message["status"]
             span.set_tag(http_tags.STATUS_CODE, str(status_code))
@@ -56,9 +59,9 @@ class TraceMiddleware:
         self,
         app: ASGIApp,
         *,
-        tracer: typing.Optional[Tracer] = None,
+        tracer: Optional[Tracer] = None,
         service: str = "asgi",
-        tags: typing.Union[str, typing.Dict[str, str]] = None,
+        tags: Union[Mapping[str, str], Sequence[str]] = None,
         distributed_tracing: bool = True,
         backend: TraceBackend = None,
     ) -> None:
@@ -66,9 +69,11 @@ class TraceMiddleware:
             tracer = global_tracer
 
         if tags is None:
-            tags = {}
+            tags = []
         if isinstance(tags, str):
-            tags = parse_tags(tags)
+            tags = parse_tags_from_string(tags)
+        elif isinstance(tags, list):
+            tags = parse_tags_from_list(tags)
 
         assert isinstance(tags, dict)
 
@@ -82,10 +87,12 @@ class TraceMiddleware:
         self._distributed_tracing = distributed_tracing
         self.backend = backend
 
-    async def send_with_tracing(self, send: Send, message: Message) -> None:
+    async def send_with_tracing(
+        self, send: Send, scope: Scope, message: Message
+    ) -> None:
         span = self.tracer.current_span()
         if span is not None and message.get("type") == "http.response.start":
-            self.backend.on_http_response_start(span, message)
+            self.backend.on_http_response_start(span, scope, message)
         await send(message)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
@@ -107,12 +114,11 @@ class TraceMiddleware:
             name="asgi.request", service=self.service, span_type=http_tags.TYPE,
         )
 
-        self.backend.init_span(span, scope)
+        self.backend.initialize(span, scope)
 
-        for key, value in self.tags.items():
-            span.set_tag(key, value)
+        span.set_tags(self.tags)
 
-        send = functools.partial(self.send_with_tracing, send)
+        send = functools.partial(self.send_with_tracing, send, scope)
 
         try:
             await self.app(scope, receive, send)
@@ -123,12 +129,23 @@ class TraceMiddleware:
             span.finish()
 
 
-def parse_tags(value: str) -> typing.Dict[str, str]:
-    tags = {}
-    for tag in CommaSeparatedStrings(value):
-        key, sep, val = tag.partition(":")
-        if not sep:
-            raise ValueError(f"Invalid tag format: {tag!r}")
-        assert sep
-        tags[key] = val
-    return tags
+def parse_tags_from_list(tags: Sequence[str]) -> Dict[str, str]:
+    parsed: Dict[str, str] = {}
+
+    for tag in tags:
+        name, _, value = tag.partition(":")
+        parsed[name] = value
+
+    return parsed
+
+
+@deprecation.deprecated(
+    deprecated_in="0.4.0",
+    removed_in="0.5.0",
+    details=(
+        "Pass a list or dict instead. "
+        "You can use starlette.datastructures.CommaSeparatedStrings for parsing."
+    ),
+)
+def parse_tags_from_string(value: str) -> Dict[str, str]:
+    return parse_tags_from_list(CommaSeparatedStrings(value))

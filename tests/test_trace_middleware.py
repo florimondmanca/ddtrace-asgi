@@ -1,5 +1,5 @@
 import time
-import typing
+from typing import Dict, Iterator, List, Union
 
 import httpx
 import pytest
@@ -34,7 +34,7 @@ async def test_app(application: str, tracer: DummyTracer) -> None:
 
     traces = tracer.writer.pop_traces()
     assert len(traces) == 1
-    spans: typing.List[Span] = traces[0]
+    spans: List[Span] = traces[0]
     assert len(spans) == 1
     span = spans[0]
     assert span.span_id
@@ -87,7 +87,7 @@ async def test_child(application: str, tracer: Tracer) -> None:
 
     traces = tracer.writer.pop_traces()
     assert len(traces) == 1
-    spans: typing.List[Span] = traces[0]
+    spans: List[Span] = traces[0]
     assert len(spans) == 2
     spans_by_name = {s.name: s for s in spans}
 
@@ -160,7 +160,7 @@ async def test_tracer_scope_item(tracer: Tracer) -> None:
 
 
 @pytest.fixture
-def trace_query_string() -> typing.Iterator[None]:
+def trace_query_string() -> Iterator[None]:
     with override_config("asgi", trace_query_string=True):
         yield
 
@@ -183,7 +183,7 @@ async def test_trace_query_string(application: str, tracer: DummyTracer) -> None
 
     traces = tracer.writer.pop_traces()
     assert len(traces) == 1
-    spans: typing.List[Span] = traces[0]
+    spans: List[Span] = traces[0]
     assert len(spans) == 1
     span = spans[0]
     assert span.get_tag(http_ext.QUERY_STRING) == "foo=bar"
@@ -209,7 +209,7 @@ async def test_app_exception(application: str, tracer: DummyTracer) -> None:
 
     traces = tracer.writer.pop_traces()
     assert len(traces) == 1
-    spans: typing.List[Span] = traces[0]
+    spans: List[Span] = traces[0]
     assert len(spans) == 1
     span = spans[0]
     assert span.name == "asgi.request"
@@ -242,7 +242,7 @@ async def test_distributed_tracing(application: str, tracer: DummyTracer) -> Non
 
     traces = tracer.writer.pop_traces()
     assert len(traces) == 1
-    spans: typing.List[Span] = traces[0]
+    spans: List[Span] = traces[0]
     assert len(spans) == 1
     span = spans[0]
     assert span.trace_id == 1234
@@ -253,32 +253,20 @@ async def test_distributed_tracing(application: str, tracer: DummyTracer) -> Non
 @pytest.mark.parametrize(
     "tags, expected_tags",
     [
-        ("", {}),
         ({}, {}),
-        ("env:testing", {"env": "testing"}),
-        ({"env": "testing"}, {"env": "testing"}),
         ({"env": "testing", "live": "false"}, {"env": "testing", "live": "false"}),
-        ("env:testing,live:false", {"env": "testing", "live": "false"}),
-        ("env:testing, live:false", {"env": "testing", "live": "false"}),
-        ("env:staging:east", {"env": "staging:east"}),
-        ("env-testing", ValueError),
+        ({"env": "staging:east"}, {"env": "staging:east"}),
+        ([], {}),
+        (["env:testing", "live:false"], {"env": "testing", "live": "false"}),
+        (["env:staging:east"], {"env": "staging:east"}),
     ],
 )
 async def test_tags(
     application: str,
     tracer: DummyTracer,
-    tags: typing.Union[str, dict],
-    expected_tags: typing.Any,
+    tags: Union[dict, list],
+    expected_tags: Dict[str, str],
 ) -> None:
-    if expected_tags is ValueError:
-        with pytest.raises(ValueError):
-            app = create_app(
-                application, middleware=[(TraceMiddleware, {"tags": tags})],
-            )
-        return
-
-    assert isinstance(expected_tags, dict)
-
     app = create_app(
         application,
         middleware=[
@@ -291,16 +279,26 @@ async def test_tags(
 
     async with httpx.AsyncClient(app=app) as client:
         r = await client.get("http://testserver/")
-        assert r.status_code == 200
-        assert r.text == "Hello, world!"
 
-        traces = tracer.writer.pop_traces()
-        assert len(traces) == 1
-        spans: typing.List[Span] = traces[0]
-        assert len(spans) == 1
-        span = spans[0]
-        assert span.name == "asgi.request"
-        assert span.service == "test.asgi.service"
-        assert span.resource == "GET /"
-        for key, value in expected_tags.items():
-            assert span.get_tag(key) == value
+    assert r.status_code == 200
+    assert r.text == "Hello, world!"
+
+    traces = tracer.writer.pop_traces()
+    assert len(traces) == 1
+    spans: List[Span] = traces[0]
+    assert len(spans) == 1
+    span = spans[0]
+    assert span.name == "asgi.request"
+    assert span.service == "test.asgi.service"
+    assert span.resource == "GET /"
+    for key, value in expected_tags.items():
+        assert span.get_tag(key) == value
+
+
+@pytest.mark.parametrize(
+    "tags", ["", "env:testing"],
+)
+def test_tags_deprecated(tags: Union[str, dict]) -> None:
+    app = create_app("raw")
+    with pytest.deprecated_call():
+        TraceMiddleware(app, tags=tags)
