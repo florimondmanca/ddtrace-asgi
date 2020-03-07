@@ -6,7 +6,7 @@ from ddtrace import Span, Tracer
 from ddtrace.ext import http as http_ext
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from ddtrace_asgi.middleware import TraceBackend, TraceMiddleware
+from ddtrace_asgi import TraceBackend, TraceMiddleware
 from tests.utils.fixtures import create_app
 
 
