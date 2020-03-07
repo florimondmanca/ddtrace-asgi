@@ -1,0 +1,33 @@
+trigger:
+  - master
+
+variables:
+  CI: true
+
+jobs:
+  - job: Check
+    steps:
+      - template: templates/install.yml
+        parameters:
+          pythonVersion: "3.8"
+      - script: scripts/check
+        displayName: "Run checks"
+
+  - job: Test
+    strategy:
+      matrix:
+        python-3.6:
+          python.version: "3.6"
+        python-3.7:
+          python.version: "3.7"
+        python-3.8:
+          python.version: "3.8"
+
+    steps:
+      - template: templates/install.yml
+        parameters:
+          pythonVersion: "$(python.version)"
+      - script: scripts/test
+        displayName: "Run tests"
+      - script: bash <(curl -s https://codecov.io/bash)
+        displayName: "Upload coverage"

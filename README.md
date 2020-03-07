@@ -1,6 +1,6 @@
 # ddtrace-asgi
 
-[![Build Status](https://travis-ci.com/florimondmanca/ddtrace-asgi.svg?branch=master)](https://travis-ci.com/florimondmanca/ddtrace-asgi)
+[![Build Status](https://dev.azure.com/florimondmanca/public/_apis/build/status/florimondmanca.ddtrace-asgi?branchName=master)](https://dev.azure.com/florimondmanca/public/_build/latest?definitionId=2&branchName=master)
 [![Coverage](https://codecov.io/gh/florimondmanca/ddtrace-asgi/branch/master/graph/badge.svg)](https://codecov.io/gh/florimondmanca/ddtrace-asgi)
 [![Package version](https://badge.fury.io/py/ddtrace-asgi.svg)](https://pypi.org/project/ddtrace-asgi)
 
