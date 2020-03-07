@@ -1,14 +1,54 @@
+import functools
 import typing
 
-from ddtrace import Tracer, tracer as global_tracer
-from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY
+from ddtrace import Span, Tracer, tracer as global_tracer
+from ddtrace.constants import ANALYTICS_SAMPLE_RATE_KEY, MANUAL_DROP_KEY
 from ddtrace.ext import http as http_tags
 from ddtrace.http import store_request_headers, store_response_headers
 from ddtrace.propagation.http import HTTPPropagator
-from ddtrace.settings import config
-from starlette.datastructures import CommaSeparatedStrings, Headers
-from starlette.requests import Request
+from ddtrace.settings import IntegrationConfig, config as global_config
+from starlette.datastructures import URL, CommaSeparatedStrings, Headers
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+
+class TraceBackend:
+    config: IntegrationConfig = global_config.asgi
+
+    def init_span(self, span: Span, scope: Scope) -> None:
+        try:
+            raw_headers = scope["headers"]
+            method = scope["method"]
+            url = URL(scope=scope)
+        except KeyError:
+            # Invalid ASGI.
+            span.set_tag(MANUAL_DROP_KEY)
+            return
+
+        headers = Headers(raw=raw_headers)
+
+        # NOTE: any header set in the future will not be stored in the span.
+        store_request_headers(headers, span, self.config)
+
+        span.resource = f"{method} {url.path}"
+
+        span.set_tag(http_tags.METHOD, method)
+        span.set_tag(http_tags.URL, str(url))
+        if self.config.get("trace_query_string", False):
+            span.set_tag(http_tags.QUERY_STRING, url.query)
+
+        span.set_tag(
+            ANALYTICS_SAMPLE_RATE_KEY,
+            self.config.get_analytics_sample_rate(use_global_config=True),
+        )
+
+    def on_http_response_start(self, span: Span, message: Message) -> None:
+        if "status" in message:
+            status_code: int = message["status"]
+            span.set_tag(http_tags.STATUS_CODE, str(status_code))
+        if "headers" in message:
+            response_headers = Headers(raw=message["headers"])
+            # NOTE: any header set in the future will not be stored in the span.
+            store_response_headers(response_headers, span, self.config)
 
 
 class TraceMiddleware:
@@ -20,6 +60,7 @@ class TraceMiddleware:
         service: str = "asgi",
         tags: typing.Union[str, typing.Dict[str, str]] = None,
         distributed_tracing: bool = True,
+        backend: TraceBackend = None,
     ) -> None:
         if tracer is None:
             tracer = global_tracer
@@ -31,11 +72,21 @@ class TraceMiddleware:
 
         assert isinstance(tags, dict)
 
+        if backend is None:
+            backend = TraceBackend()
+
         self.app = app
         self.tracer = tracer
         self.service = service
         self.tags = tags
         self._distributed_tracing = distributed_tracing
+        self.backend = backend
+
+    async def send_with_tracing(self, send: Send, message: Message) -> None:
+        span = self.tracer.current_span()
+        if span is not None and message.get("type") == "http.response.start":
+            self.backend.on_http_response_start(span, message)
+        await send(message)
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         scope["ddtrace_asgi.tracer"] = self.tracer
@@ -44,19 +95,7 @@ class TraceMiddleware:
             await self.app(scope, receive, send)
             return
 
-        request = Request(scope=scope, receive=receive)
-        try:
-            request_headers = request.headers
-            method = request.method
-            url = request.url
-        except KeyError:
-            # ASGI message is invalid - most likely missing the 'headers' or 'method'
-            # fields.
-            await self.app(scope, receive, send)
-            return
-
-        # Make sure we don't use potentially unsafe request attributes after this point.
-        del request
+        request_headers = Headers(raw=scope.get("headers", []))
 
         if self._distributed_tracing:
             propagator = HTTPPropagator()
@@ -64,44 +103,19 @@ class TraceMiddleware:
             if context.trace_id:
                 self.tracer.context_provider.activate(context)
 
-        resource = "%s %s" % (method, url.path)
         span = self.tracer.trace(
-            name="asgi.request",
-            service=self.service,
-            resource=resource,
-            span_type=http_tags.TYPE,
+            name="asgi.request", service=self.service, span_type=http_tags.TYPE,
         )
 
-        span.set_tag(
-            ANALYTICS_SAMPLE_RATE_KEY,
-            config.asgi.get_analytics_sample_rate(use_global_config=True),
-        )
-        span.set_tag(http_tags.METHOD, method)
-        span.set_tag(http_tags.URL, str(url))
-        if config.asgi.get("trace_query_string"):
-            span.set_tag(http_tags.QUERY_STRING, url.query)
+        self.backend.init_span(span, scope)
 
         for key, value in self.tags.items():
             span.set_tag(key, value)
 
-        # NOTE: any request header set in the future will not be stored in the span.
-        store_request_headers(request_headers, span, config.asgi)
-
-        async def send_with_tracing(message: Message) -> None:
-            span = self.tracer.current_span()
-
-            if span and message.get("type") == "http.response.start":
-                if "status" in message:
-                    status_code: int = message["status"]
-                    span.set_tag(http_tags.STATUS_CODE, str(status_code))
-                if "headers" in message:
-                    response_headers = Headers(raw=message["headers"])
-                    store_response_headers(response_headers, span, config.asgi)
-
-            await send(message)
+        send = functools.partial(self.send_with_tracing, send)
 
         try:
-            await self.app(scope, receive, send_with_tracing)
+            await self.app(scope, receive, send)
         except BaseException as exc:
             span.set_traceback()
             raise exc from None

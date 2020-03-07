@@ -4,7 +4,7 @@ from ddtrace import Tracer
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.routing import Route
 from starlette.types import ASGIApp
 
@@ -20,6 +20,11 @@ async def child(request: Request) -> Response:
         return PlainTextResponse("Hello, child!")
 
 
+async def get_show(request: Request) -> Response:
+    pk = request.path_params["pk"]
+    return JSONResponse({"id": pk, "title": "PyCon"})
+
+
 async def exception(request: Request) -> NoReturn:
     raise RuntimeError("Oops")
 
@@ -27,6 +32,7 @@ async def exception(request: Request) -> NoReturn:
 routes = [
     Route("/", home),
     Route("/child/", child),
+    Route("/shows/{pk:int}/", get_show),
     Route("/exception/", exception),
 ]
 
